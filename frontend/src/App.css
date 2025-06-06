@@ -1,38 +1,197 @@
-.App {
-    text-align: center;
+/* Estilos customizados para o Trading App */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #111827;
+  color: #ffffff;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+/* Scrollbar personalizada */
+::-webkit-scrollbar {
+  width: 6px;
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+::-webkit-scrollbar-track {
+  background: #374151;
 }
 
-.App-link {
-    color: #61dafb;
+::-webkit-scrollbar-thumb {
+  background: #6B7280;
+  border-radius: 3px;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
+}
+
+/* Animações customizadas */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Estilos para inputs e selects */
+input[type="number"],
+input[type="date"],
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+
+/* Estilos para modais */
+.modal-backdrop {
+  backdrop-filter: blur(4px);
+}
+
+/* Responsive utilities */
+@media (max-width: 768px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+/* Loading spinner */
+.spinner {
+  border: 2px solid #374151;
+  border-top: 2px solid #3B82F6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Candlestick chart styles */
+.candlestick-green {
+  fill: #10B981;
+  stroke: #10B981;
+}
+
+.candlestick-red {
+  fill: #EF4444;
+  stroke: #EF4444;
+}
+
+/* Trading button styles */
+.btn-buy {
+  background: linear-gradient(135deg, #10B981, #059669);
+  box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2);
+}
+
+.btn-buy:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+  box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.3);
+}
+
+.btn-sell {
+  background: linear-gradient(135deg, #EF4444, #DC2626);
+  box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.2);
+}
+
+.btn-sell:hover {
+  background: linear-gradient(135deg, #DC2626, #B91C1C);
+  box-shadow: 0 10px 15px -3px rgba(239, 68, 68, 0.3);
+}
+
+/* Card hover effects */
+.card-hover {
+  transition: all 0.2s ease-in-out;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+}
+
+/* Progress bar */
+.progress-bar {
+  transition: width 0.3s ease-in-out;
+}
+
+/* Status indicators */
+.status-online {
+  background: linear-gradient(45deg, #10B981, #34D399);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+}
+
+.status-offline {
+  background: linear-gradient(45deg, #EF4444, #F87171);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+}
+
+/* Price movement animations */
+.price-up {
+  color: #10B981;
+  animation: priceFlash 0.5s ease-in-out;
+}
+
+.price-down {
+  color: #EF4444;
+  animation: priceFlash 0.5s ease-in-out;
+}
+
+@keyframes priceFlash {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  .mobile-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .mobile-text-sm {
+    font-size: 0.875rem;
+  }
+  
+  .mobile-p-2 {
+    padding: 0.5rem;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
 }
