@@ -341,6 +341,350 @@ export const PortfolioScreen = ({ onAssetSelect }) => {
   );
 };
 
+// ===== MODO REPLAY =====
+export const ReplayMode = ({ symbol, onBack }) => {
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [candleData, setCandleData] = useState([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [speed, setSpeed] = useState(1);
+  const [indicators, setIndicators] = useState({});
+  const [selectedIndicators, setSelectedIndicators] = useState(['sma20', 'rsi']);
+  const [positions, setPositions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  
+  const intervalRef = useRef(null);
+
+  useEffect(() => {
+    if (symbol) {
+      loadHistoricalData();
+    }
+  }, [symbol, selectedDate]);
+
+  useEffect(() => {
+    if (candleData.length > 0) {
+      calculateIndicators();
+    }
+  }, [candleData, selectedIndicators]);
+
+  useEffect(() => {
+    if (isPlaying && currentIndex < candleData.length - 1) {
+      intervalRef.current = setInterval(() => {
+        setCurrentIndex(prev => {
+          if (prev >= candleData.length - 1) {
+            setIsPlaying(false);
+            return prev;
+          }
+          return prev + 1;
+        });
+      }, 1000 / speed);
+    } else {
+      clearInterval(intervalRef.current);
+    }
+
+    return () => clearInterval(intervalRef.current);
+  }, [isPlaying, speed, currentIndex, candleData.length]);
+
+  const loadHistoricalData = async () => {
+    try {
+      setLoading(true);
+      // Tentar carregar dados reais do Polygon
+      try {
+        const data = await DataService.getIntradayData(symbol, selectedDate);
+        setCandleData(data);
+      } catch (error) {
+        console.warn('Erro ao carregar dados reais, usando mock:', error);
+        // Fallback para dados mock
+        const mockData = DataService.generateMockCandles(symbol, 390); // 6.5 horas * 60 minutos
+        setCandleData(mockData);
+      }
+      setCurrentIndex(0);
+    } catch (error) {
+      console.error('Erro ao carregar dados históricos:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateIndicators = () => {
+    if (candleData.length === 0) return;
+    
+    const allIndicators = TechnicalIndicators.calculateAll(candleData);
+    
+    // Filtra apenas os indicadores selecionados
+    const filtered = {};
+    selectedIndicators.forEach(indicator => {
+      if (allIndicators[indicator]) {
+        filtered[indicator] = allIndicators[indicator];
+      }
+    });
+    
+    setIndicators(filtered);
+  };
+
+  const handleTrade = async (type) => {
+    if (currentIndex >= candleData.length) return;
+    
+    const currentPrice = candleData[currentIndex].close;
+    const timestamp = candleData[currentIndex].timestamp;
+    
+    try {
+      let order;
+      if (type === 'BUY') {
+        order = TradingEngine.buy(symbol, currentPrice, 1, timestamp);
+      } else if (type === 'SELL') {
+        order = TradingEngine.sell(symbol, currentPrice, 1, timestamp);
+      } else if (type === 'CLOSE') {
+        order = TradingEngine.closePosition(symbol, currentPrice, timestamp);
+      }
+      
+      // Atualiza posições
+      setPositions(TradingEngine.getCurrentPositions());
+      
+      // Feedback visual
+      alert(`${type === 'BUY' ? 'Compra' : type === 'SELL' ? 'Venda' : 'Fechamento'} executado: R$ ${currentPrice.toFixed(2)}`);
+      
+    } catch (error) {
+      alert(`Erro: ${error.message}`);
+    }
+  };
+
+  const resetReplay = () => {
+    setCurrentIndex(0);
+    setIsPlaying(false);
+    setPositions([]);
+  };
+
+  // Dados visíveis até o índice atual
+  const visibleData = candleData.slice(0, currentIndex + 1);
+  const currentCandle = candleData[currentIndex];
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" onClick={onBack}>
+            ← Voltar
+          </Button>
+          <div>
+            <h1 className="text-xl font-bold text-white">Replay - {symbol}</h1>
+            <p className="text-gray-400">Simulação Histórica</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="bg-gray-700 text-white px-3 py-2 rounded-lg border border-gray-600"
+          />
+          <Button variant="outline" onClick={loadHistoricalData}>
+            <Calendar className="w-4 h-4" />
+            Carregar
+          </Button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-400">Carregando dados históricos...</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Controles de Replay */}
+          <Card>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button 
+                  variant={isPlaying ? "danger" : "success"}
+                  onClick={() => setIsPlaying(!isPlaying)}
+                  disabled={currentIndex >= candleData.length - 1}
+                >
+                  {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                  {isPlaying ? 'Pausar' : 'Reproduzir'}
+                </Button>
+                
+                <Button variant="secondary" onClick={resetReplay}>
+                  <Square className="w-4 h-4" />
+                  Reiniciar
+                </Button>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400">Velocidade:</span>
+                  {[0.5, 1, 2, 4].map(s => (
+                    <button
+                      key={s}
+                      onClick={() => setSpeed(s)}
+                      className={`px-2 py-1 rounded ${speed === s ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400'}`}
+                    >
+                      {s}x
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="text-right">
+                <p className="text-white font-semibold">
+                  {currentCandle ? format(new Date(currentCandle.timestamp), 'HH:mm:ss', { locale: ptBR }) : '--:--:--'}
+                </p>
+                <p className="text-gray-400 text-sm">
+                  {currentIndex + 1} / {candleData.length}
+                </p>
+              </div>
+            </div>
+
+            {/* Barra de progresso */}
+            <div className="mt-4">
+              <div className="w-full bg-gray-700 rounded-full h-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all"
+                  style={{ width: `${(currentIndex / (candleData.length - 1)) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Informações da vela atual */}
+          {currentCandle && (
+            <Card>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div>
+                  <p className="text-gray-400 text-sm">Abertura</p>
+                  <p className="text-white font-semibold">R$ {currentCandle.open.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 text-sm">Máxima</p>
+                  <p className="text-green-400 font-semibold">R$ {currentCandle.high.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 text-sm">Mínima</p>
+                  <p className="text-red-400 font-semibold">R$ {currentCandle.low.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 text-sm">Fechamento</p>
+                  <p className="text-white font-semibold">R$ {currentCandle.close.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 text-sm">Volume</p>
+                  <p className="text-white font-semibold">{(currentCandle.volume / 1000).toFixed(0)}K</p>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Gráfico */}
+          <Card title="Gráfico de Candlesticks">
+            <CandlestickChart 
+              data={visibleData} 
+              indicators={indicators}
+              height={400}
+            />
+          </Card>
+
+          {/* Controles de Trading */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Button 
+              variant="success" 
+              size="lg"
+              onClick={() => handleTrade('BUY')}
+              disabled={!currentCandle}
+            >
+              <TrendingUp className="w-5 h-5" />
+              Comprar
+            </Button>
+            
+            <Button 
+              variant="danger" 
+              size="lg"
+              onClick={() => handleTrade('SELL')}
+              disabled={!currentCandle}
+            >
+              <TrendingDown className="w-5 h-5" />
+              Vender
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              size="lg"
+              onClick={() => handleTrade('CLOSE')}
+              disabled={!currentCandle || positions.length === 0}
+            >
+              <Target className="w-5 h-5" />
+              Fechar Posição
+            </Button>
+          </div>
+
+          {/* Informações da conta */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <div className="text-center">
+                <p className="text-gray-400 text-sm">Saldo</p>
+                <p className="text-2xl font-bold text-white">
+                  R$ {TradingEngine.getBalance().toLocaleString('pt-BR')}
+                </p>
+              </div>
+            </Card>
+            
+            <Card>
+              <div className="text-center">
+                <p className="text-gray-400 text-sm">Posições</p>
+                <p className="text-2xl font-bold text-white">{positions.length}</p>
+              </div>
+            </Card>
+            
+            <Card>
+              <div className="text-center">
+                <p className="text-gray-400 text-sm">Trades</p>
+                <p className="text-2xl font-bold text-white">{TradingEngine.getTradeHistory().length}</p>
+              </div>
+            </Card>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+// ===== MODO BACKTEST =====
+export const BacktestMode = ({ symbol, onBack }) => {
+  const [dateFrom, setDateFrom] = useState(format(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'));
+  const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [selectedStrategy, setSelectedStrategy] = useState('DEMA_RSI');
+  const [strategyParams, setStrategyParams] = useState({});
+  const [backtestResult, setBacktestResult] = useState(null);
+  const [candleData, setCandleData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [running, setRunning] = useState(false);
+
+  const strategies = [
+    { 
+      id: 'DEMA_RSI', 
+      name: 'DEMA + RSI',
+      description: 'Estratégia baseada em DEMA e RSI',
+      params: {
+        demaPeriod: { value: 21, min: 10, max: 50, label: 'Período DEMA' },
+        rsiPeriod: { value: 14, min: 5, max: 30, label: 'Período RSI' },
+        oversold: { value: 30, min: 20, max: 40, label: 'RSI Sobrevenda' },
+        overbought: { value: 70, min: 60, max: 80, label: 'RSI Sobrecompra' }
+      }
+    },
+    {
+      id: 'MACD_SIGNAL',
+      name: 'MACD Signal',
+      description: 'Estratégia baseada em cruzamentos MACD',
+      params: {
+        fastPeriod: { value: 12, min: 8, max: 20, label: 'EMA Rápida' },
+        slowPeriod: { value: 26, min: 20, max: 35, label: 'EMA Lenta' },
+        signalPeriod: { value: 9, min: 5, max: 15, label: 'Linha de Sinal' }
+      }
+    }
+  ];
+
 // ===== TELA DO ATIVO =====
 export const AssetScreen = ({ symbol, onBack, onModeSelect }) => {
   const [assetData, setAssetData] = useState(null);
